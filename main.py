@@ -1,17 +1,13 @@
-# 1. Install Dependencies
-!pip install flask pyngrok flask-sqlalchemy pytz -q
-
 import os
 from datetime import datetime
 import pytz
 from flask import Flask, render_template_string, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from pyngrok import ngrok
 
-# 2. DATABASE
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///compliance.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///compliance.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -38,13 +34,11 @@ with app.app_context():
         c2 = Client(company_name="Tata Steel", country="India", entity_type="Public Ltd")
         db.session.add_all([c1, c2])
         db.session.commit()
-
         t1 = Task(client_id=1, title="Annual Filing", category="Tax", due_date=datetime(2023, 12, 31).date(), status="Pending")
         t2 = Task(client_id=2, title="GST Monthly Return", category="GST", due_date=datetime(2026, 4, 20).date(), status="Pending")
         db.session.add_all([t1, t2])
         db.session.commit()
 
-# 3. FRONTEND UI
 HTML_UI = """
 <!DOCTYPE html>
 <html>
@@ -67,19 +61,16 @@ HTML_UI = """
             <hr>
             <div id="clientList"></div>
         </div>
-
         <div class="col-md-9 p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 id="selectedClientName">Select a Client</h2>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#taskModal">+ New Task</button>
             </div>
-
             <div class="row mb-4">
                 <div class="col-md-4"><div class="card p-3 stats-card text-center"><h5>Total</h5><h3 id="statTotal">0</h3></div></div>
                 <div class="col-md-4"><div class="card p-3 stats-card text-center bg-warning"><h5>Pending</h5><h3 id="statPending">0</h3></div></div>
                 <div class="col-md-4"><div class="card p-3 stats-card text-center bg-danger text-white"><h5>Overdue</h5><h3 id="statOverdue">0</h3></div></div>
             </div>
-
             <div class="card p-3 shadow-sm">
                 <table class="table">
                     <thead>
@@ -91,7 +82,6 @@ HTML_UI = """
         </div>
     </div>
 </div>
-
 <div class="modal fade" id="taskModal" tabindex="-1">
     <div class="modal-dialog">
         <form id="taskForm" class="modal-content">
@@ -109,11 +99,9 @@ HTML_UI = """
         </form>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let currentClientId = null;
-
     async function loadClients() {
         const res = await fetch('/api/clients');
         const clients = await res.json();
@@ -121,28 +109,22 @@ HTML_UI = """
             `<a class="client-link" onclick="selectClient(${c.id}, '${c.company_name}')">${c.company_name}</a>`
         ).join('');
     }
-
     async function selectClient(id, name) {
         currentClientId = id;
         document.getElementById('selectedClientName').innerText = name;
         document.getElementById('formClientId').value = id;
         loadTasks();
     }
-
     async function loadTasks() {
         if(!currentClientId) return;
         const res = await fetch(`/api/tasks?client_id=${currentClientId}`);
         const data = await res.json();
-
-        // Update Stats
         const today = new Date().toISOString().split('T')[0];
         const pending = data.filter(t => t.status === 'Pending');
         const overdue = pending.filter(t => t.due_date < today);
-
         document.getElementById('statTotal').innerText = data.length;
         document.getElementById('statPending').innerText = pending.length;
         document.getElementById('statOverdue').innerText = overdue.length;
-
         document.getElementById('taskBody').innerHTML = data.map(t => {
             const isOverdue = t.status === 'Pending' && t.due_date < today;
             return `<tr class="${isOverdue ? 'overdue' : ''}">
@@ -156,7 +138,6 @@ HTML_UI = """
             </tr>`;
         }).join('');
     }
-
     document.getElementById('taskForm').onsubmit = async (e) => {
         e.preventDefault();
         await fetch('/api/tasks', {
@@ -172,19 +153,16 @@ HTML_UI = """
         bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
         loadTasks();
     };
-
     async function updateStatus(id) {
         await fetch(`/api/tasks/${id}`, { method: 'PUT' });
         loadTasks();
     }
-
     window.onload = loadClients;
 </script>
 </body>
 </html>
 """
 
-# 4. API ENDPOINTS
 @app.route('/')
 def index(): return render_template_string(HTML_UI)
 
@@ -220,18 +198,6 @@ def update_task(id):
     db.session.commit()
     return jsonify({"message": "Updated"})
 
-# 5. RUN SERVER WITH NGROK
-NGROK_TOKEN = "36mSHpSl4DWk4VZO6zTudKO3Piz_2ReYvKNYAz8zPKgUJRMxH"
-ngrok.set_auth_token(NGROK_TOKEN)
-
-try:
-    public_url = ngrok.connect(5000).public_url
-    print(f"Public URL Link: {public_url}")
-    app.run(port=5000)
-except Exception as e:
-    print(f"Error: {e}")
-
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
