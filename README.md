@@ -1,8 +1,4 @@
-# Mini Compliance Tracker Video Demo Link:
-https://drive.google.com/file/d/1HLtIDQ1-VcKf9oY7XBUi9pmEudiEGRrJ/view?usp=sharing
 
-# Mini Compliance Tracker Code Run Link:
-https://colab.research.google.com/drive/1SSa-LPDNWjA7Z2zWm9-bjU8kLMQf03sL?usp=sharing
 
 # Mini Compliance Tracker Live Deployed Link:
 https://mini-compliance-tracker-8lyh.onrender.com
